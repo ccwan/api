@@ -2,6 +2,7 @@ package api;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -23,7 +24,6 @@ public class DeviceService {
 
 	@GET
 	@Path("/name/{name}")
-	@Consumes("application/json")
 	@Produces("application/json")
 	public ArrayList <ClassField> getDeviceField(@PathParam("name") String name) {
 		return Database.getDataPatternField(name);
@@ -32,8 +32,13 @@ public class DeviceService {
 	@POST
 	@Path("/name/{name}")
 	@Consumes("application/json")
-	@Produces("application/json")
-	public Response creatDevice(ArrayList <ClassField> getDeviceField) {
+//	public Response creatDevice(@PathParam("name") String name, ClassFieldParam req) {
+	public Response creatDevice(@PathParam("name") String name, ArrayList <ClassField> req) {
+		System.out.println("obj class: " + req.getClass().getName()); 
+		System.out.println("obj: " + req.toString()); 
+		
+		Database.insertDevice(name, req);
+		
 		return Response.status(200).build();
 	}
 

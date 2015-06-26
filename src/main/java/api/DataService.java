@@ -18,7 +18,6 @@ import javax.ws.rs.core.Response;
 public class DataService {
 
 	static int selected = 0;
-	static DataPoint mydata = new DataPoint();
 	
 	@GET
 	@Path("/{name}/{id}")  
@@ -46,7 +45,7 @@ public class DataService {
     public Response createData(@PathParam("name") String name, Object obj) {  	    
 		System.out.println("obj class=["+ obj.getClass().getName() +"]");      
 		System.out.println("obj=["+ obj.toString() +"]");      
-    	if (Database.insertData(name, obj)) {
+    	if (Database.insertData2(name, obj)) {
     		return Response.status(200).build();  
     	}
     	else {

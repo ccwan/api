@@ -1,5 +1,8 @@
 package api;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -8,11 +11,20 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import javax.ws.rs.PathParam;
 
-import javassist.*;
+import org.codehaus.jackson.JsonEncoding;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.JsonParser;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
 
+import javassist.*;
 
 public class Database {
 	ArrayList<Integer> numList = new ArrayList<Integer>();
@@ -109,11 +121,17 @@ public class Database {
 			default:
 				break;			
 			}
-		    field.setModifiers(Modifier.PUBLIC);  
+		    field.setModifiers(Modifier.PRIVATE);  
 		    
-		    // Ìí¼ÓgetterºÍsetter·½·¨  
-		    ctClass.addMethod(CtNewMethod.setter("set" + f.getParamName(), field));  
-		    ctClass.addMethod(CtNewMethod.getter("get" + f.getParamName(), field));  
+		    // ï¿½ï¿½ï¿½getterï¿½ï¿½setterï¿½ï¿½ï¿½ï¿½  
+		    String name = f.getParamName();
+	        char[] cs=name.toCharArray();
+	        cs[0]-=32;
+	        name = String.valueOf(cs);
+	        System.out.println("class name upper= " + name);
+		    
+		    ctClass.addMethod(CtNewMethod.setter("set" + name, field));  
+		    ctClass.addMethod(CtNewMethod.getter("get" + name, field));  
 		    ctClass.addField(field);  
 		} catch (CannotCompileException e) {
 			// TODO Auto-generated catch block
@@ -135,30 +153,35 @@ public class Database {
 		for (String name : classNameList) {
 			System.out.println("class name = " + name);
 	    	ArrayList <ClassField> fieldList = Database.getDataPatternField(name);
-		    // ´´½¨Ò»¸öÀà  
-	    	CtClass ctClass = classPool.makeClass("api.rfid");  
-		    // ÎªÀàÐÍÉèÖÃ½Ó¿Ú  
-		    //ctClass.setInterfaces(new CtClass[] {classPool.get(Runnable.class.getName())});  
-		  
-		    // ÎªÀàÐÍÉèÖÃ×Ö¶Î  , getter and setter method
+		    // ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½  
+	    	CtClass ctClass = classPool.makeClass("api." + name);  
+		    // Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ó¿ï¿½  
+		    //ctClass.setInterfaces(new CtClass[] {classPool.get(Runnable.class.getName())});  	    	
+	    	
+		    // Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¶ï¿½  , getter and setter method
 	    	for (ClassField f : fieldList) {
 	    		setField(f, classPool, ctClass);
 	    	}
-		    
-		    // ²ÎÊý¹¹ÔìÆ÷  
+	    	
+	    	CtConstructor constructor = new CtConstructor(null, ctClass);  
+		    constructor.setModifiers(Modifier.PUBLIC);  
+		    constructor.setBody("{}");  
+		    ctClass.addConstructor(constructor);  
+		  
+		    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½  
 	    	System.out.println("field size = " + fieldList.size());
 	    	CtClass[] constructorParams = new CtClass[fieldList.size()];
 	    	int i = 0;
 	    	for (ClassField f : fieldList) {
 	    		String s;
 				switch (f.getParamType()) {
-				case "string":
+				case ClassField.DATA_TYPE_STRING:
 	    			s = String.class.getName();
 	    			break;
-				case "number":
+				case ClassField.DATA_TYPE_NUMBER:
 					s = Integer.class.getName();
 	    			break;
-				case "boolean":
+				case ClassField.DATA_TYPE_BOOLEAN:
 					s = Boolean.class.getName();
 	    			break;
 				default:
@@ -172,28 +195,33 @@ public class Database {
                 i++;
 	    	}
 	    	
-	    	
-	    	CtConstructor constructor = new CtConstructor(constructorParams, ctClass);  
+	    	constructor = new CtConstructor(constructorParams, ctClass);  
 		    constructor.setModifiers(Modifier.PUBLIC);  
 		    String cmd = "{";
 		    for (ClassField f : fieldList) {
 		    	cmd += "this." + f.getParamName();
-		    	cmd += "=$"+ fieldList.indexOf(f) + ";";
+		    	cmd += "=$"+ (fieldList.indexOf(f) + 1) + ";";
 		    }
 		    cmd += "}";
 		    System.out.println("setter body = [" + cmd + "]");
 		    constructor.setBody(cmd);  
 		    ctClass.addConstructor(constructor);  
 		  
-		    // ÎªÀàÉèÖÃ·½·¨  
 //		    CtMethod method = new CtMethod(CtClass.voidType, "run", null, ctClass);  
 //		    method.setModifiers(Modifier.PUBLIC);  
-//		    method.setBody("{System.out.println(\"Ö´ÐÐ½á¹û\" + this.value);}");  
+//		    method.setBody("{System.out.println(\"Ö´ï¿½Ð½ï¿½ï¿½\" + this.value);}");  
 //		    ctClass.addMethod(method);  
 		  
-		    // ¼ÓÔØºÍÖ´ÐÐÉú³ÉµÄÀà  
 		    Class<?> clazz = ctClass.toClass();  
 		    classList.put(name, clazz);
+		    
+		    System.out.println("---Created:-------------------------------");
+		    System.out.println(clazz.toString() );
+		    System.out.println(clazz.getConstructors().toString() );
+		    System.out.println(clazz.getDeclaredFields().toString());
+		    System.out.println(clazz.getDeclaredMethods().toString() );
+		    System.out.println(clazz.getFields().toString());
+		    System.out.println("------------------------------------------");
 		}
 		
 		Iterator<String> itr = classList.keySet().iterator();
@@ -221,13 +249,22 @@ public class Database {
 			while (rs.next()) {
 				System.out.println("item:");
 				HashMap <String, Object> item = new HashMap <String, Object> ();
-				for (ClassField f : fieldList) {
-					String stringValue;
+				for (ClassField f : fieldList) {					
 					switch(f.getParamType()) {
-					case "string":
-						stringValue = rs.getString(f.getParamName());
+					case Constant.DATA_TYPE_STRING:
+						String stringValue = rs.getString(f.getParamName());
 						System.out.println("name:" + f.getParamName() + ",value:" + stringValue);
 						item.put(f.getParamName(), stringValue);
+						break;
+					case Constant.DATA_TYPE_NUMBER:
+						int intValue = rs.getInt(f.getParamName());
+						System.out.println("name:" + f.getParamName() + ",value:" + intValue);
+						item.put(f.getParamName(), intValue);
+						break;
+					case Constant.DATA_TYPE_BOOLEAN:
+						boolean boolValue = rs.getBoolean(f.getParamName());
+						System.out.println("name:" + f.getParamName() + ",value:" + boolValue);
+						item.put(f.getParamName(), boolValue);
 						break;
 					default:
 						System.out.println("not found");
@@ -244,8 +281,74 @@ public class Database {
 		return rsp;
 	}
 	
+	public static boolean insertDevice(String name, ArrayList <ClassField> deviceField) {			
+		if (classList.containsKey(name)) {
+			return false;
+		}
+		
+		if (conn == null) connect();
+		
+		for (ClassField f : deviceField) {
+			String ste = "insert into tbl_device_pattern values ( \"" + name
+					+ "\", \"" + f.paramName + "\", \"" + f.paramType + "\");";
+
+			try {
+				Statement stmt = conn.createStatement();
+				if (stmt.execute(ste)) {
+					System.out.println("succeed");
+				}
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+	    	System.out.println("ste=[" + ste + "]");
+		}
+
+		String ste2 = "create table tbl_data_" + name +" (";
+		
+		boolean needComma = false;
+		for (ClassField f : deviceField) {
+			if (needComma) {
+				ste2 += ",";
+			}
+			else {
+				needComma = true;
+			}
+			
+			ste2 += f.paramName;
+			
+			switch (f.paramType) {
+			case ClassField.DATA_TYPE_STRING :
+				ste2 += " varchar(255)";
+				break;
+			case ClassField.DATA_TYPE_NUMBER :
+				ste2 += " int";
+				break;
+			case ClassField.DATA_TYPE_BOOLEAN :
+				ste2 += " int";
+				break;
+			}
+		}
+		
+		ste2 += ");";
+    	System.out.println("ste=[" + ste2 + "]");
+
+		try {
+			Statement stmt = conn.createStatement();
+			if (stmt.execute(ste2)) {
+				System.out.println("succeed");
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		    	
+		return true;
+	}
 	
-	public static boolean insertData(@PathParam("name") String name, Object req) {	
+	
+	public static boolean insertData(String name, Object req) {	
 		
 		if (classList.containsKey(name)) {
 			Class<?> myclass = classList.get(name);
@@ -275,8 +378,14 @@ public class Database {
     			Object obj = map.get(f.getParamName());
     			System.out.println("name is ["+ f.getParamName() + "], obj is ["+ obj.getClass().getName() +"]");
         		switch(f.getParamType()) {
-        		case "string":
+        		case Constant.DATA_TYPE_STRING:
         			valueStr += "\"" + (String) obj + "\"";
+        			break;
+        		case Constant.DATA_TYPE_NUMBER:
+        			valueStr += (int) obj;
+        			break;
+        		case Constant.DATA_TYPE_BOOLEAN:
+        			valueStr += ((boolean) obj)? "1": "0";
         			break;
         		default:
         			System.out.println("not found");
@@ -287,6 +396,94 @@ public class Database {
     	ste += keyStr + ") values (" + valueStr + ");";
     	System.out.println("ste=["+ ste +"]");        
     	
+		if (conn == null) connect();
+		try {
+			Statement stmt = conn.createStatement();
+			if (stmt.execute(ste)) {
+				System.out.println("succeed");
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	
+    	return true;
+	}
+
+	
+	public static boolean insertData2(String name, Object req) {	
+		
+		if (classList.containsKey(name)) {
+			Class<?> myclass = classList.get(name);
+			System.out.println("---myclass:" + myclass.getName());
+			System.out.println("req:" + req.getClass().getName());
+			if (myclass.isInstance(req)) {
+				System.out.println("----match!!!");
+			}
+
+			ObjectMapper objectMapper = new ObjectMapper ();
+			JsonGenerator jsonGenerator = null;
+	        try {
+
+	        	ByteArrayOutputStream baos = new ByteArrayOutputStream();  
+	        	
+	        	jsonGenerator = objectMapper.getJsonFactory().createJsonGenerator(baos, JsonEncoding.UTF8);
+	        	jsonGenerator.writeObject(req);
+
+	        	String jsonstr = baos.toString();   
+	        	System.out.println("--jsonstr=" + jsonstr);
+				Object newobj = (Object) objectMapper.readValue(jsonstr, myclass);
+				System.out.println("aaa---:" + newobj.getClass().toString());
+			} catch (JsonGenerationException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (JsonMappingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+		}
+		
+//		HashMap <String, Object> map = (HashMap <String, Object>) req;
+//		ArrayList <ClassField> fieldList = getDataPatternField(name);
+//    	String ste = "insert into tbl_data_" + name + " (";
+//    	String keyStr = "";
+//    	String valueStr = "";
+//    	boolean firstDone = false;
+//    	for (ClassField f : fieldList) {
+//    		if (firstDone) {
+//    			keyStr += ",";
+//    			valueStr += ",";
+//    		}
+//    		else {
+//    			firstDone = true;
+//    		}
+//    		if (map.containsKey(f.getParamName())) {
+//    			keyStr += f.getParamName();
+//    			Object obj = map.get(f.getParamName());
+//    			System.out.println("name is ["+ f.getParamName() + "], obj is ["+ obj.getClass().getName() +"]");
+//        		switch(f.getParamType()) {
+//        		case Constant.DATA_TYPE_STRING:
+//        			valueStr += "\"" + (String) obj + "\"";
+//        			break;
+//        		case Constant.DATA_TYPE_NUMBER:
+//        			valueStr += (int) obj;
+//        			break;
+//        		case Constant.DATA_TYPE_BOOLEAN:
+//        			valueStr += ((boolean) obj)? "1": "0";
+//        			break;
+//        		default:
+//        			System.out.println("not found");
+//        		    break;
+//        		}    			
+//    		}    		
+//    	}
+//    	ste += keyStr + ") values (" + valueStr + ");";
+//    	System.out.println("ste=["+ ste +"]");        
+//    	
 //		if (conn == null) connect();
 //		try {
 //			Statement stmt = conn.createStatement();
@@ -299,6 +496,5 @@ public class Database {
 //		}
     	
     	return true;
-	}
-
+	}	
 }

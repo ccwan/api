@@ -30,6 +30,20 @@
     <artifactId>netty-all</artifactId>
     <version>4.0.7.Final</version>
 </dependency>
+
+<dependency>
+    <groupId>org.javassist</groupId>
+    <artifactId>javassist</artifactId>
+    <version>3.19.0-GA</version>
+</dependency>
+  
+<dependency>
+    <groupId>org.xerial</groupId>
+    <artifactId>sqlite-jdbc</artifactId>
+    <version>3.8.10.1</version>
+</dependency>  
+  
+  
   
  </dependencies>
   
